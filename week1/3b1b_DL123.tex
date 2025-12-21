@@ -1,0 +1,702 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{geometry}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\geometry{margin=1in}
+
+\lstset{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray},
+    stringstyle=\color{red},
+    breaklines=true,
+    showstringspaces=false,
+    backgroundcolor=\color{lightgray!20}
+}
+
+\title{Comprehensive Deep Learning Notes: 3Blue1Brown Series}
+\author{Based on Neural Networks Chapters 1-3}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Video 1: Neural Networks Structure (Chapter 1)}
+
+\subsection{Overview}
+Introduction to handwritten digit recognition using neural networks. This chapter covers the basic architecture: neurons, layers, weights, and biases, along with the mathematical foundation of forward propagation.
+
+\subsection{Key Concepts}
+
+\subsubsection{Neurons and Activation}
+\begin{itemize}
+    \item \textbf{Neuron}: A computational unit that holds a number between 0 and 1
+    \item \textbf{Activation}: The value inside a neuron, representing how ``lit up'' it is
+    \item Input layer: 784 neurons (28×28 pixel grid)
+    \item Output layer: 10 neurons (digits 0-9)
+    \item Hidden layers: Arbitrary choice (2 layers with 16 neurons each in example)
+\end{itemize}
+
+\subsubsection{Network Parameters}
+\begin{itemize}
+    \item Total neurons: $784 \to 16 \to 16 \to 10$
+    \item Total weights and biases: $\approx 13,000$ parameters
+\end{itemize}
+
+\subsection{Mathematical Foundation}
+
+\subsubsection{Forward Propagation}
+For a neuron in layer $l+1$:
+
+\textbf{Weighted Sum Computation:}
+\[
+z_j^{(l+1)} = \sum_{i=1}^{n_l} w_{ij}^{(l)} a_i^{(l)} + b_j^{(l)}
+\]
+
+Where:
+\begin{itemize}
+    \item $w_{ij}^{(l)}$: weight from neuron $i$ in layer $l$ to neuron $j$ in layer $l+1$
+    \item $a_i^{(l)}$: activation of neuron $i$ in layer $l$
+    \item $b_j^{(l)}$: bias for neuron $j$ in layer $l$
+    \item $z_j^{(l+1)}$: weighted sum before activation function
+\end{itemize}
+
+\textbf{Activation Function (Sigmoid):}
+\[
+a_j^{(l+1)} = \sigma(z_j^{(l+1)}) = \frac{1}{1 + e^{-z_j^{(l+1)}}}
+\]
+
+Alternatively, ReLU (modern approach):
+\[
+a_j^{(l+1)} = \max(0, z_j^{(l+1)})
+\]
+
+\subsubsection{Matrix Form}
+\[
+\mathbf{a}^{(l+1)} = \sigma\left(\mathbf{W}^{(l)} \mathbf{a}^{(l)} + \mathbf{b}^{(l)}\right)
+\]
+
+Where:
+\begin{itemize}
+    \item $\mathbf{W}^{(l)}$: weight matrix (rows = connections to one neuron in next layer)
+    \item $\mathbf{a}^{(l)}$: activation vector from previous layer
+    \item $\mathbf{b}^{(l)}$: bias vector
+    \item $\sigma$: activation function applied element-wise
+\end{itemize}
+
+\subsection{Why Layered Structure?}
+\begin{enumerate}
+    \item Layer $1 \to 2$: Detect edges and small patterns
+    \item Layer $2 \to 3$: Combine edges to recognize loops and lines
+    \item Layer $3 \to$ Output: Recognize complete digits from patterns
+\end{enumerate}
+
+\subsection{Code Example}
+\begin{lstlisting}
+import numpy as np
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-z))
+
+def forward_pass(X, weights, biases):
+    """Forward pass through network"""
+    a = X
+    for W, b in zip(weights, biases):
+        z = np.dot(W, a) + b
+        a = sigmoid(z)
+    return a
+
+# Network initialization
+input_size = 784
+hidden_sizes = [16, 16]
+output_size = 10
+
+weights = [np.random.randn(hidden_sizes[0], input_size) * 0.01]
+for i in range(len(hidden_sizes)-1):
+    weights.append(np.random.randn(
+        hidden_sizes[i+1], hidden_sizes[i]) * 0.01)
+weights.append(np.random.randn(output_size, hidden_sizes[-1]) * 0.01)
+
+biases = [np.zeros((size,)) for size in hidden_sizes + [output_size]]
+
+# Forward pass
+output = forward_pass(image, weights, biases)
+predicted_digit = np.argmax(output)
+\end{lstlisting}
+
+\newpage
+
+\section{Video 2: Gradient Descent and Learning (Chapter 2)}
+
+\subsection{Overview}
+This chapter introduces the cost function definition, gradient descent algorithm, and how networks learn through optimization.
+
+\subsection{Cost Function}
+
+\subsubsection{Single Training Example}
+\[
+C_{\text{single}} = \sum_{k=1}^{10} (y_k - a_k^{(L)})^2
+\]
+
+Where:
+\begin{itemize}
+    \item $y_k$: desired output for digit $k$ (1 if correct digit, 0 otherwise)
+    \item $a_k^{(L)}$: actual output activation
+    \item $L$: final layer
+    \item Sum over all 10 output neurons
+\end{itemize}
+
+\subsubsection{Total Cost Function}
+\[
+C_{\text{total}} = \frac{1}{n} \sum_{i=1}^{n} C_i
+\]
+
+Where:
+\begin{itemize}
+    \item $n$: number of training examples
+    \item $C_i$: cost for $i$-th training example
+\end{itemize}
+
+\subsection{Gradient Descent}
+
+\subsubsection{Conceptual Framework}
+\begin{enumerate}
+    \item Start with random weights and biases
+    \item Compute gradient of cost function: $\nabla C$
+    \item Update parameters in direction of negative gradient
+    \item Repeat until convergence
+\end{enumerate}
+
+\subsubsection{Gradient Vector}
+\[
+\nabla C = \left[\frac{\partial C}{\partial w_1}, \frac{\partial C}{\partial w_2}, \ldots, \frac{\partial C}{\partial w_{13000}}\right]
+\]
+
+Each component tells us:
+\begin{itemize}
+    \item \textbf{Sign}: Whether to increase or decrease parameter
+    \item \textbf{Magnitude}: How much that parameter affects cost (relative importance)
+\end{itemize}
+
+\subsubsection{Update Rule}
+\[
+w_{\text{new}} = w_{\text{old}} - \alpha \frac{\partial C}{\partial w}
+\]
+\[
+b_{\text{new}} = b_{\text{old}} - \alpha \frac{\partial C}{\partial b}
+\]
+
+Where:
+\begin{itemize}
+    \item $\alpha$: learning rate (small positive number, e.g., 0.01)
+    \item $\frac{\partial C}{\partial w}$, $\frac{\partial C}{\partial b}$: partial derivatives (components of gradient)
+\end{itemize}
+
+\subsection{Multivariable Calculus Connection}
+For 2D example:
+\[
+\nabla C = \left[\frac{\partial C}{\partial x}, \frac{\partial C}{\partial y}\right]
+\]
+
+\begin{itemize}
+    \item Points in direction of steepest ascent
+    \item Negative gradient points downhill (minimization direction)
+    \item Magnitude indicates steepness of slope
+\end{itemize}
+
+\subsection{Code Example}
+\begin{lstlisting}
+def compute_cost(output, target):
+    """Compute MSE cost"""
+    return np.sum((target - output)**2)
+
+def gradient_descent_step(weights, biases, X, y, 
+                         learning_rate):
+    """Single gradient descent step"""
+    # Forward pass
+    activations = forward_pass(X[0], weights, biases)
+    
+    # Compute cost
+    cost = compute_cost(activations, y[0])
+    
+    # Note: Gradient computation requires backpropagation
+    # (see Chapter 3)
+    
+    return weights, biases, cost
+
+# Training loop
+for epoch in range(num_epochs):
+    for batch_X, batch_y in mini_batches:
+        weights, biases, cost = gradient_descent_step(
+            weights, biases, batch_X, batch_y, 
+            learning_rate=0.01
+        )
+    print(f"Epoch {epoch}, Cost: {cost}")
+\end{lstlisting}
+
+\subsection{Key Insights}
+\begin{itemize}
+    \item Network learns $\approx 96\%$ accuracy on test data with simple 2-hidden-layer architecture
+    \item Can improve to 98\% with tweaking
+    \item \textbf{Important caveat}: Network doesn't necessarily learn patterns we expect
+    \begin{itemize}
+        \item Second layer weights appear almost random
+        \item Network can confidently classify random noise
+        \item Cost function doesn't incentivize semantic features
+    \end{itemize}
+\end{itemize}
+
+\subsection{Stochastic Gradient Descent (SGD)}
+
+Problems with full gradient descent:
+\begin{itemize}
+    \item Computing gradient over ALL training examples is slow
+    \item $10,000\text{s of examples} \times 13,000\text{ parameters} = \text{very expensive}$
+\end{itemize}
+
+Solution:
+\begin{enumerate}
+    \item Randomly shuffle training data
+    \item Divide into mini-batches (e.g., 100 examples each)
+    \item Compute gradient using mini-batch only
+    \item Update weights
+    \item Repeat with next mini-batch
+\end{enumerate}
+
+Effect:
+\begin{itemize}
+    \item ``Drunk man stumbling downhill'' vs ``carefully calculated descent''
+    \item Quick steps with approximate gradients vs slow steps with exact gradient
+    \item Usually converges faster in practice
+\end{itemize}
+
+\newpage
+
+\section{Video 3: Backpropagation (Chapter 3)}
+
+\subsection{Overview}
+This chapter covers how to efficiently compute gradients using the backpropagation algorithm, the chain rule application in neural networks, and visual intuition before mathematical formalism.
+
+\subsection{Key Concept: What Should Change?}
+
+\subsubsection{Output Layer Perspective}
+For each output neuron, we want:
+\begin{itemize}
+    \item Desired neuron: activation $\to 1$
+    \item Other neurons: activation $\to 0$
+\end{itemize}
+
+Desired changes (nudges):
+\begin{itemize}
+    \item If $\text{output}_k < \text{target}_k$: nudge UP
+    \item If $\text{output}_k > \text{target}_k$: nudge DOWN
+    \item Magnitude of nudge $\propto |\text{output}_k - \text{target}_k|$
+\end{itemize}
+
+\subsubsection{Three Ways to Achieve Nudge}
+For neuron $j$ with activation $a_j$:
+\[
+z_j = \sum_i w_{ij} a_i + b_j
+\]
+\[
+a_j = \sigma(z_j)
+\]
+
+To increase $a_j$:
+\begin{enumerate}
+    \item \textbf{Increase bias}: $\Delta b_j > 0$
+    \item \textbf{Increase weights}: $\Delta w_{ij} > 0$ (especially if $a_i$ is large)
+    \item \textbf{Change previous activations}: $\Delta a_i > 0$ (for positive weights) or $< 0$ (for negative weights)
+\end{enumerate}
+
+\subsection{Backpropagation Algorithm (Intuitive)}
+
+\subsubsection{Step 1: Output Layer}
+\[
+\text{error}_{\text{output}} = (a_{\text{output}} - y_{\text{target}})
+\]
+\[
+\text{desired\_change}_{\text{output}} = -2 \cdot \text{error}_{\text{output}}
+\]
+
+\subsubsection{Step 2: Propagate Backward}
+For each neuron in previous layer:
+\[
+\text{desire}_i = \sum_j w_{ij} \cdot \text{desire}_j
+\]
+
+Key insight: ``Neurons that fire together wire together''
+\begin{itemize}
+    \item Strong connections (large $w_{ij}$) propagate more desire
+    \item Active neurons (large $a_i$) cause larger weight updates
+\end{itemize}
+
+\subsubsection{Step 3: Update Weights and Biases}
+\[
+\Delta w_{ij} \propto \text{desire}_j \times a_i
+\]
+
+Intuition:
+\begin{itemize}
+    \item If neuron $j$ needs to change a lot (large desire)
+    \item AND neuron $i$ is very active (large $a_i$)
+    \item THEN strengthen connection $w_{ij}$
+\end{itemize}
+
+\subsection{Backpropagation Algorithm (Mathematical)}
+
+\subsubsection{Chain Rule Application}
+For cost $C$ and weight $w_{ij}$:
+\[
+\frac{\partial C}{\partial w_{ij}} = \frac{\partial C}{\partial a_j} \times \frac{\partial a_j}{\partial z_j} \times \frac{\partial z_j}{\partial w_{ij}}
+\]
+
+Where:
+\begin{itemize}
+    \item $\frac{\partial z_j}{\partial w_{ij}} = a_i$
+    \item For sigmoid: $\frac{\partial a_j}{\partial z_j} = \sigma'(z_j) = \sigma(z_j)(1 - \sigma(z_j))$
+    \item For ReLU: $\frac{\partial a_j}{\partial z_j} = 1$ if $z_j > 0$, else $0$
+\end{itemize}
+
+Define: $\delta_j = \frac{\partial C}{\partial z_j}$ (error in $z$)
+
+Then:
+\[
+\frac{\partial C}{\partial w_{ij}} = \delta_j \times a_i
+\]
+\[
+\frac{\partial C}{\partial b_j} = \delta_j
+\]
+
+\subsubsection{Recursive Definition of $\delta$}
+For output layer $L$:
+\[
+\delta_j^{(L)} = (a_j^{(L)} - y_j) \times \sigma'(z_j^{(L)})
+\]
+
+For hidden layer $l$:
+\[
+\delta_j^{(l)} = \left(\sum_k w_{jk}^{(l)} \delta_k^{(l+1)}\right) \times \sigma'(z_j^{(l)})
+\]
+
+Note: $\delta_k^{(l+1)}$ comes from next layer. This enables efficient backward pass.
+
+\subsubsection{Full Backpropagation Update}
+
+\begin{enumerate}
+    \item Forward pass: compute all $a^{(l)}$ and $z^{(l)}$
+
+    \item Compute output layer error:
+    \[
+    \boldsymbol{\delta}^{(L)} = (a^{(L)} - \mathbf{y}) \odot \sigma'(\mathbf{z}^{(L)})
+    \]
+    where $\odot$ is element-wise multiplication
+
+    \item Backward pass ($l$ from $L-1$ down to $1$):
+    \[
+    \boldsymbol{\delta}^{(l)} = (\mathbf{W}^{(l)T} \boldsymbol{\delta}^{(l+1)}) \odot \sigma'(\mathbf{z}^{(l)})
+    \]
+
+    \item Compute gradients:
+    \[
+    \frac{\partial C}{\partial \mathbf{W}^{(l)}} = \boldsymbol{\delta}^{(l+1)} (\mathbf{a}^{(l)})^T
+    \]
+    \[
+    \frac{\partial C}{\partial \mathbf{b}^{(l)}} = \boldsymbol{\delta}^{(l+1)}
+    \]
+
+    \item Update parameters:
+    \[
+    \mathbf{W}^{(l)} := \mathbf{W}^{(l)} - \alpha \frac{\partial C}{\partial \mathbf{W}^{(l)}}
+    \]
+    \[
+    \mathbf{b}^{(l)} := \mathbf{b}^{(l)} - \alpha \frac{\partial C}{\partial \mathbf{b}^{(l)}}
+    \]
+\end{enumerate}
+
+\subsection{Code Example}
+\begin{lstlisting}
+def sigmoid_derivative(a):
+    """Derivative of sigmoid: sigma'(z) = sigma(z)(1-sigma(z))"""
+    return a * (1 - a)
+
+def relu_derivative(z):
+    """Derivative of ReLU"""
+    return (z > 0).astype(float)
+
+def backpropagation(X, y, weights, biases, activations, 
+                    z_values):
+    """
+    X: input (784,)
+    y: target (10,)
+    weights, biases: network parameters
+    activations: list of a^(l) from forward pass
+    z_values: list of z^(l) from forward pass
+    """
+    m = 1  # single example
+    L = len(weights)
+    
+    # Initialize gradients
+    dW = [np.zeros_like(W) for W in weights]
+    db = [np.zeros_like(b) for b in biases]
+    
+    # Output layer error
+    delta = ((activations[-1] - y) * 
+             sigmoid_derivative(activations[-1]))
+    
+    # Backpropagate
+    for l in range(L-1, -1, -1):
+        # Compute gradients for layer l
+        dW[l] = np.outer(delta, activations[l])
+        db[l] = delta
+        
+        # Propagate error to previous layer
+        if l > 0:
+            delta = (np.dot(weights[l].T, delta) * 
+                    sigmoid_derivative(activations[l]))
+    
+    return dW, db
+
+def train_network(X, y, weights, biases, learning_rate=0.01, 
+                  epochs=1000):
+    """
+    X: training data (n_samples, 784)
+    y: labels (n_samples, 10) - one-hot encoded
+    """
+    for epoch in range(epochs):
+        total_cost = 0
+        
+        for i in range(len(X)):
+            # Forward pass
+            activations = [X[i]]
+            z_values = []
+            a = X[i]
+            
+            for W, b in zip(weights, biases):
+                z = np.dot(W, a) + b
+                z_values.append(z)
+                a = sigmoid(z)
+                activations.append(a)
+            
+            # Compute cost
+            cost = np.sum((a - y[i])**2)
+            total_cost += cost
+            
+            # Backpropagation
+            dW, db = backpropagation(X[i], y[i], weights, 
+                                     biases, activations, z_values)
+            
+            # Update weights and biases
+            for l in range(len(weights)):
+                weights[l] -= learning_rate * dW[l]
+                biases[l] -= learning_rate * db[l]
+        
+        if epoch % 100 == 0:
+            print(f"Epoch {epoch}, Avg Cost: {total_cost/len(X)}")
+    
+    return weights, biases
+\end{lstlisting}
+
+\subsection{Mini-Batch and Stochastic Gradient Descent}
+
+\subsubsection{Full Batch vs Mini-Batch}
+
+Full Batch:
+\[
+\nabla C = \frac{1}{n} \sum_{i=1}^{n} \nabla C_i \quad \text{[average gradient over ALL samples]}
+\]
+\begin{itemize}
+    \item Expensive: $O(13,000 \times n)$ per step
+    \item Accurate direction but slow
+\end{itemize}
+
+Mini-Batch (typical size: 32-256):
+\[
+\nabla C \approx \frac{1}{m} \sum_{i=1}^{m} \nabla C_i \quad \text{[average gradient over mini-batch]}
+\]
+\begin{itemize}
+    \item Cheap: $O(13,000 \times m)$ per step (where $m \ll n$)
+    \item Noisy gradient but fast convergence
+    \item Good approximation in practice
+\end{itemize}
+
+Stochastic Gradient Descent (size 1):
+\[
+\nabla C \approx \nabla C_i \quad \text{[gradient of single example]}
+\]
+\begin{itemize}
+    \item Very fast: $O(13,000)$ per step
+    \item Noisy but allows online learning
+\end{itemize}
+
+\subsubsection{Algorithm}
+\begin{lstlisting}
+def train_sgd(X, y, weights, biases, learning_rate=0.01, 
+              batch_size=32, epochs=10):
+    """Stochastic Gradient Descent with mini-batches"""
+    n = len(X)
+    
+    for epoch in range(epochs):
+        # Shuffle data
+        indices = np.random.permutation(n)
+        X_shuffled = X[indices]
+        y_shuffled = y[indices]
+        
+        # Process mini-batches
+        for i in range(0, n, batch_size):
+            X_batch = X_shuffled[i:i+batch_size]
+            y_batch = y_shuffled[i:i+batch_size]
+            
+            # Accumulate gradients over mini-batch
+            dW_batch = [np.zeros_like(W) for W in weights]
+            db_batch = [np.zeros_like(b) for b in biases]
+            
+            for j in range(len(X_batch)):
+                # Forward pass
+                activations, z_values = forward_and_store(
+                    X_batch[j], weights, biases
+                )
+                
+                # Backpropagation
+                dW, db = backpropagation(
+                    X_batch[j], y_batch[j], weights, 
+                    biases, activations, z_values
+                )
+                
+                # Accumulate
+                for l in range(len(weights)):
+                    dW_batch[l] += dW[l]
+                    db_batch[l] += db[l]
+            
+            # Average and update
+            for l in range(len(weights)):
+                weights[l] -= (learning_rate/len(X_batch)) * dW_batch[l]
+                biases[l] -= (learning_rate/len(X_batch)) * db_batch[l]
+    
+    return weights, biases
+\end{lstlisting}
+
+\subsection{Why Backpropagation is Efficient}
+
+\subsubsection{Naive Approach}
+For 13,000 weights, computing each $\frac{\partial C}{\partial w}$:
+\[
+\frac{\partial C}{\partial w} = \frac{\partial C}{\partial a_{\text{output}}} \times \frac{\partial a}{\partial z} \times \cdots \times \frac{\partial z}{\partial w}
+\]
+
+Computing each derivative independently: $O(13,000)$
+
+Computing all: $O(13,000^2) = O(169,000,000)$ per example!
+
+\subsubsection{Backpropagation Solution}
+Reuse intermediate computations:
+\begin{enumerate}
+    \item $\delta$ from one layer reused to compute $\delta$ for previous layer
+    \item Share $\frac{\partial a}{\partial z}$ computations across multiple gradients
+\end{enumerate}
+
+Complexity: $O(13,000)$ per example!
+
+Speedup: $13,000\times$
+
+\newpage
+
+\section{Summary and Key Formulas}
+
+\subsection{Sigmoid Function}
+\[
+\sigma(z) = \frac{1}{1 + e^{-z}}
+\]
+\[
+\sigma'(z) = \sigma(z)(1 - \sigma(z))
+\]
+Range: $(0, 1)$
+
+\subsection{ReLU Function}
+\[
+f(z) = \max(0, z)
+\]
+\[
+f'(z) = \begin{cases} 1 & \text{if } z > 0 \\ 0 & \text{otherwise} \end{cases}
+\]
+Range: $[0, \infty)$
+
+Advantage: Easier to train, avoids vanishing gradient
+
+\subsection{Cost Function (MSE)}
+\[
+C = \frac{1}{n} \sum_{i=1}^{n} \|\mathbf{y}_i - \mathbf{a}_i\|^2
+\]
+
+\subsection{Chain Rule (Backpropagation Core)}
+\[
+\frac{\partial C}{\partial w} = \frac{\partial C}{\partial a} \times \frac{\partial a}{\partial z} \times \frac{\partial z}{\partial w}
+\]
+
+\subsection{Full Forward Pass}
+\[
+\mathbf{a}^{(0)} = \mathbf{x} \quad \text{(input)}
+\]
+\[
+\mathbf{z}^{(l)} = \mathbf{W}^{(l)} \mathbf{a}^{(l-1)} + \mathbf{b}^{(l)}
+\]
+\[
+\mathbf{a}^{(l)} = \sigma(\mathbf{z}^{(l)})
+\]
+\[
+\mathbf{y}_{\text{pred}} = \mathbf{a}^{(L)} \quad \text{(output)}
+\]
+
+\subsection{Full Backward Pass}
+\[
+\boldsymbol{\delta}^{(L)} = (\mathbf{y}_{\text{pred}} - \mathbf{y}_{\text{target}}) \odot \sigma'(\mathbf{z}^{(L)})
+\]
+\[
+\boldsymbol{\delta}^{(l)} = (\mathbf{W}^{(l+1)T} \boldsymbol{\delta}^{(l+1)}) \odot \sigma'(\mathbf{z}^{(l)}) \quad \text{for } l = L-1, \ldots, 1
+\]
+\[
+\frac{\partial C}{\partial \mathbf{W}^{(l)}} = \boldsymbol{\delta}^{(l)} (\mathbf{a}^{(l-1)})^T
+\]
+\[
+\frac{\partial C}{\partial \mathbf{b}^{(l)}} = \boldsymbol{\delta}^{(l)}
+\]
+
+\subsection{Parameter Update}
+\[
+\mathbf{W}^{(l)} \leftarrow \mathbf{W}^{(l)} - \alpha \frac{\partial C}{\partial \mathbf{W}^{(l)}}
+\]
+\[
+\mathbf{b}^{(l)} \leftarrow \mathbf{b}^{(l)} - \alpha \frac{\partial C}{\partial \mathbf{b}^{(l)}}
+\]
+
+Where $\alpha$ is the learning rate.
+
+\newpage
+
+\section{Practical Considerations}
+
+\begin{enumerate}
+    \item \textbf{Learning Rate}: Too high $\Rightarrow$ divergence; too low $\Rightarrow$ slow convergence
+    \item \textbf{Weight Initialization}: Small random values ($\sim 0.01$) avoid saturation
+    \item \textbf{Batch Size}: Trade-off between gradient accuracy and computational efficiency
+    \item \textbf{Epochs}: Typically 10-100 for simple networks; more for complex data
+    \item \textbf{Validation}: Always test on unseen data to check generalization
+    \item \textbf{Regularization}: Add penalty terms (L1/L2) to prevent overfitting
+    \item \textbf{Activation Functions}: Sigmoid (old), ReLU (modern), others for specific tasks
+\end{enumerate}
+
+\section{References}
+\begin{itemize}
+    \item Nielsen, M. A. (2015). Neural Networks and Deep Learning. \textit{Online resource}.
+    \item Olah, C. (n.d.). Chris Olah's Blog. Retrieved from \url{http://colah.github.io/}
+    \item Distill. (n.d.). Distill. Retrieved from \url{https://distill.pub/}
+    \item Goodfellow, I., Bengio, Y., \& Courville, A. (2016). \textit{Deep Learning}. MIT Press.
+\end{itemize}
+
+\end{document}
